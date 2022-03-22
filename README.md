@@ -72,16 +72,16 @@ Edit the cluster.yaml file and place the following code within the file:
     apiVersion: eksctl.io/v1alpha5
     kind: ClusterConfig
     metadata:
-    name: eks-litmus-demo
-    region: ${AWS_REGION}
-    version: "1.21"
+        name: eks-litmus-demo
+        region: ${AWS_REGION}
+        version: "1.21"
     managedNodeGroups:
-    - instanceType: m5.large
-        amiFamily: AmazonLinux2
-        name: eks-litmus-demo-ng
-        desiredCapacity: 2
-        minSize: 2
-        maxSize: 4
+        - instanceType: m5.large
+          amiFamily: AmazonLinux2
+          name: eks-litmus-demo-ng
+          desiredCapacity: 2
+          minSize: 2
+          maxSize: 4
 
 Save, then exit.
 
@@ -141,16 +141,19 @@ Create a namespace to install LitmusChaos:
 
 By default, Litmus Helm chart creates NodePort services. We'll need to change the backend service type to ClusterIP and front-end service type to LoadBalancer, so we can access the Litmus ChaosCenter using a load balancer.
 
+Create a file named override-litmus.yaml, by running:
+
     $ cat <<EOF > override-litmus.yaml
-Enter the following immediately after:
+
+Now edit the *override-litmus.yaml* file and place the below code in it.:
 
     portal:
-    server:
+      server:
         service:
-        type: ClusterIP
-    frontend:
+          type: ClusterIP
+      frontend:
         service:
-        type: LoadBalancer
+          type: LoadBalancer
     EOF
 
 ![](./images/7.png)
@@ -282,6 +285,116 @@ Verify if the nginx pod is running:
     $ kubectl get pods
 
 ![](./images/20.png)
+
+## Chaos Experiments
+
+[Litmus ChaosHub](https://hub.litmuschaos.io/) is a public repository where LitmusChaos community members publish their chaos experiments such as pod-delete, node-drain, node-cpu-hog, etc. In this demo walkthrough, we'll perform the pod-autoscaler experiment from LitmusChaos hub to test cluster auto scaling on Amazon EKS cluster.
+
+### Experiment: Pod Autoscaler
+
+The purpose of this pod auto scaler experiment is to check the ability of nodes to accomodate the number of replicas for a deployment. Plus, the experiment can also be used to check the cluster auto-scaling feature.
+
+**Our Hypothesis:** Amazon EKS cluster should auto scale when cluster capacity is insufficient to run the pods.
+
+Chaos experiment can be launched using the Litmus ChaosCenter UI by creating a workflow.
+
+Navigate to Litmus Chaos Center and select **Litmus Workflows** in the left-hand navigation and then select the **Schedule a workflow** button to create a workflow.
+
+![](./images/21.png)
+
+Select the Self-Agent radio button on the Schedule a new Litmus workflow page and select **Next.**
+
+Select the **Self-Agent** radio button on the Schedule a new Litmus workflow page and select **Next.**
+
+![](./images/22.png)
+
+Choose **Create a new workflow using the experiments from ChaosHubs** and leave the **Litmus ChaosHub** selected from the dropdown.
+
+![](./images/23.png)
+
+Now enter a name for your workflow on the next screen, then select **Next.**
+
+In the next step let's add the experiments. Select **Add a new experiment**; then search for autoscaler and select the **generic/pod-autoscaler** radio button.
+
+![](./images/25.png)
+
+![](./images/26.png)
+
+We'll edit the experiment and change some parameters. Choose the Edit icon:
+
+![](./images/27.png)
+
+Accept the default values in the **General**, **Target Application**, and **Define the steady state for this application** sections. 
+
+![](./images/28.png)
+
+![](./images/29.png)
+
+![](./images/30.png)
+
+In the **Tune Experiment** section, set the **TOTAL_CHAOS_DURATION** to 180 and **REPLICA_COUNT** to 10.
+
+*TOTAL_CHAOS_DURATION* sets the desired chaos duration in seconds and *REPLICA_COUNT* is the number of replicas to scale during the experiment. Select **Finish.**
+
+![](./images/31.png)
+
+Then, choose **Next** and accept the defaults for **reliability score** and schedule the experiment to *run now*. Lastly, select **Finish** to run the chaos experiment.
+
+![](./images/32.png)
+
+![](./images/33.png)
+
+We have successfully created a new Litmus workflow!
+
+![](./images/34.png)
+
+Our chaos experiment is now scheduled to run and we can look at the status by clicking on the workflow.
+
+![](./images/35.png)
+
+From the ChaosResults, we can see that the experiment failed because there was no capacity in the cluster to run 10 replicas.
+
+![](./images/36.png)
+
+### Install Cluster Autoscaler
+
+
+Cluster Autoscaler is a tool that automatically adjusts the size of the Kubernetes cluster based on the utilization of Pods and Nodes in your cluster Cluster Autoscaler will attempt to determine the CPU, memory, and GPU resources provided by an Auto Scaling group based on the instance type specified in its launch configuration or launch template.
+
+- Let's now create an IAM OIDC identity provider for our cluster with the following command: 
+
+    $ eksctl utils associate-iam-oidc-provider --cluster eks-litmus-demo --approve
+
+![](./images/37.png)
+### Create an IAM policy and role
+
+- We'll need to create an IAM policy that grants the permissions that the Cluster Autoscaler requires to use an IAM role.
+
+    cat <<EOF > cluster-autoscaler-policy.json
+
+- Paste:
+
+    { 
+        "Version": "2012-10-17", 
+        "Statement": [
+            {
+                "Action": [
+                "autoscaling:DescribeAutoScalingGroups", "autoscaling:DescribeAutoScalingInstances", "autoscaling:DescribeLaunchConfigurations", "autoscaling:DescribeTags", "autoscaling:SetDesiredCapacity", "autoscaling:TerminateInstanceInAutoScalingGroup", "ec2:DescribeLaunchTemplateVersions" 
+                ], 
+                "Resource": "*", 
+                "Effect": "Allow" 
+            } 
+        ] 
+    } 
+    EOF
+
+Once the above has been pasted, run the following command:
+
+    $ aws iam create-policy \ 
+    --policy-name AmazonEKSClusterAutoscalerPolicy \ 
+    --policy-document file://cluster-autoscaler-policy.json
+
+
 
 
 
