@@ -550,7 +550,7 @@ The following steps will help us install Litmus ChaosCenter via helm.
 
 **Create the namespace on which you want to install Litmus ChaosCenter**
 
-    - The ChaosCenter can be placed in any namespace, but for this scenario we are using litmus as the namespace.
+The ChaosCenter can be placed in any namespace, but for this scenario we are using litmus as the namespace.
 
     $ kubectl create ns litmus
 
