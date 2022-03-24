@@ -46,17 +46,18 @@ You'll want to ensure the following systems are installed prior to beginning. Fo
 
 ### Create a new EKS cluster using eksctl:
 
-1. Once you have downloaded all the necessary requirements, run the following command: 
+1. Once you have downloaded all the necessary requirements, run the following command:
 
     $ export ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account)
 
 Followed by:
 
-    $ export AWS_REGION=us-east-1 #change as per your region of choice
+    $ export AWS_REGION=us-east-1 
+    #change as per your region of choice
 
 2. Create a yaml file on your PC using the command below:
 
-    $ touch cluster.yaml
+$ touch cluster.yaml
 
 ![](./images/1.png)
 
